@@ -27,9 +27,9 @@ module fft_bfu
 		
 // These internal logic signals are the outputs when we multiply twiddle (wk)*b = temporary variables, 
 // actually might not even need this because complex_mult takes care of it in its module
-		logic [2*bit_width - 1:0] temp;
-		logic [bit_width - 1:0] a_re, a_im, b_re, b_im, temp_re, temp_im;
-		logic [bit_width - 1:0] aout_re, aout_im, bout_re, bout_im,
+		logic signed [2*bit_width - 1:0] temp;
+		logic signed [bit_width - 1:0] a_re, a_im, b_re, b_im, temp_re, temp_im;
+		logic signed [bit_width - 1:0] aout_re, aout_im, bout_re, bout_im,
 
 		
 		assign a_re = a[2*bit_width-1: bit_width];
