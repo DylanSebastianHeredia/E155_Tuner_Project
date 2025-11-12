@@ -29,7 +29,7 @@ module fft_bfu
 // actually might not even need this because complex_mult takes care of it in its module
 		logic signed [2*bit_width - 1:0] temp;
 		logic signed [bit_width - 1:0] a_re, a_im, b_re, b_im, temp_re, temp_im;
-		logic signed [bit_width - 1:0] aout_re, aout_im, bout_re, bout_im,
+		logic signed [bit_width - 1:0] aout_re, aout_im, bout_re, bout_im;
 
 		complex_mult mult_bfu_1 (b, twiddle, temp); // output should be 2*bit_width where temp = {re,im}
 	
