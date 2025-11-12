@@ -31,7 +31,8 @@ module fft_bfu
 		logic signed [bit_width - 1:0] a_re, a_im, b_re, b_im, temp_re, temp_im;
 		logic signed [bit_width - 1:0] aout_re, aout_im, bout_re, bout_im,
 
-		
+		complex_mult mult_bfu_1 (b, twiddle, temp); // output should be 2*bit_width where temp = {re,im}
+	
 		assign a_re = a[2*bit_width-1: bit_width];
 		assign a_im = a[bit_width-1: 0];
 		
@@ -45,7 +46,6 @@ module fft_bfu
 // the math portion of the BFU where aout = a + wk *b, bout = a - wk*b. but first to go in
 // order we must compute tw * b where tw and b contain both real and imaginary parts. 
 		
-		complex_mult mult_bfu_1 (b, twiddle, temp); // output should be 2*bit_width where temp = {re,im}
 		// Then compute the adders/subtracters where we have 
 		// aout_re = a_re + temp_re ;  aout_im = a_im + temp_im
 		// bout_re = b_re - temp_re ;  bout_im = b_im - temp_im
