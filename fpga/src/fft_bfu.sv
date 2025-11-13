@@ -1,5 +1,10 @@
-// November 12, 2025
-// bfu
+// Broderick Bownds & Sebastian Heredia
+// brbownds@hmc.edu, dheredia@hmc.edu
+// 11/12/2025
+
+// fft_butterfly.sv
+// This module contains the math portion of the FFT processor other than mult adn complex_mult
+// and computes the imaginary and real parts of aout and bout to write into RAM0 and RAM1.
 
 module fft_butterfly
 	#(parameter bit_width = 16)
