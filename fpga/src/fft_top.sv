@@ -11,7 +11,8 @@ module fft_top
 
     // internal logic
 	logic rd_sel, we0, we1;
-	logic [M-2:0] twiddle_adr, adr0_a, adr0_b, adr1_a, adr1_b;
+	logic [M-2:0] twiddle_adr;
+	logic [M-1:0] adr0_a, adr0_b, adr1_a, adr1_b;
 	logic signed [2*bit_width-1:0] twiddle;
 	logic [2*bit_width-1:0] b_in, wd_a, wd_b, read_data, rd0_a, rd0_b, rd1_a, rd1_b;
 
