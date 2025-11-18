@@ -13,8 +13,8 @@
 
 module dual_RAM
 	#(parameter bit_width = 16,
-	  parameter N = 512,								// 512 = 2^9 
-	  parameter M = log2(N))							// M = log2(512) = 9
+	  parameter N = 16,								// 512 = 2^9 
+	  parameter M = 4)							// M = log2(512) = 9
 	 
 	 (input logic 	clk, 
 	  input logic 	we,									// Enable write & declare address vars
@@ -43,8 +43,8 @@ endmodule
 // Connect AGU twiddle_adr output to a W^k from the LUT
 module twiddle_ROM
 	#(parameter bit_width = 16,					    	// Re & Im components are 16-bits each
-	  parameter N = 512, 
-	  parameter M = log2(N))						    	// For 512pt FFT
+	  parameter N = 16, 
+	  parameter M = 4)						    	// For 512pt FFT = 9 bits
 	  
 	 (input  logic [M-2:0] twiddle_adr,	        	   // Recall: 512/2 = 2 ^ 8 -> log2(2^8) = 8-bits (INPUT)
 	  output logic [2*bit_width - 1:0] twiddle); 		// 32-bit = {Re, Im}							(OUTPUT)
@@ -61,3 +61,4 @@ module twiddle_ROM
 	assign twiddle = vectors[twiddle_adr];
 
 endmodule
+
