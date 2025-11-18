@@ -60,7 +60,7 @@ endmodule
 // Bit reversal 
 
 module reindex_bits
-	#(parameter L = 11) // instaniating L = layers and this is based on our FFT size where
+	#(parameter L = 5) // instaniating L = layers and this is based on our FFT size where
 						// 2^L = FFT size so therefore 2^(11) = 2048 FFT size
 			(input logic [L - 1:0] in,
 			output logic [L - 1:0] out);
