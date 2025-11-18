@@ -13,8 +13,8 @@
 
 module dual_RAM
 	#(parameter bit_width = 16,
-	  parameter N = 16,								// 512 = 2^9 
-	  parameter M = 4)							// M = log2(512) = 9
+	  parameter N = 32,								// 512 = 2^9 
+	  parameter M = 5)							// M = log2(512) = 9
 	 
 	 (input logic 	clk, 
 	  input logic 	we,									// Enable write & declare address vars
@@ -35,16 +35,16 @@ module dual_RAM
 				ram[adr_b] <= wd_b;
 	end
 	
-	assign rd_a = adr_a;
-	assign rd_b = adr_b;
+	assign rd_a = ram[adr_a];
+	assign rd_b = ram[adr_b];
 	
 endmodule
 
 // Connect AGU twiddle_adr output to a W^k from the LUT
 module twiddle_ROM
 	#(parameter bit_width = 16,					    	// Re & Im components are 16-bits each
-	  parameter N = 16, 
-	  parameter M = 4)						    	// For 512pt FFT = 9 bits
+	  parameter N = 32, 
+	  parameter M = 5)						    	// For 512pt FFT = 9 bits
 	  
 	 (input  logic [M-2:0] twiddle_adr,	        	   // Recall: 512/2 = 2 ^ 8 -> log2(2^8) = 8-bits (INPUT)
 	  output logic [2*bit_width - 1:0] twiddle); 		// 32-bit = {Re, Im}							(OUTPUT)
@@ -54,11 +54,10 @@ module twiddle_ROM
 	
 	// Load in data from python-generated LUT
 	initial begin
-		$readmeab("User/VECTOR_PATH.vectors", vectors);	// CHANGE to match correct path!
+		$readmemh("User/VECTOR_PATH.vectors", vectors);	// CHANGE to match correct path!
 	end
 
 	// Output the seleted twiddle based on twiddle address
 	assign twiddle = vectors[twiddle_adr];
 
 endmodule
-
