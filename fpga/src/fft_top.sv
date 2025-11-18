@@ -14,12 +14,12 @@ module fft_top
 
    logic                       rd_sel, we0, we1;   // RAMx write enable
    logic [M - 1:0]           adr0_a, adr0_b, adr1_a, adr1_b;
-   logic [M - 2:0]           twiddleadr; // twiddle ROM adr
+   logic [M - 2:0]           twiddle_adr; // twiddle ROM adr
    logic [2*width-1:0]         twiddle, a, b, write_a, write_b, aout, bout;
    logic [2*width-1:0]         rd0_a, rd0_b, rd1_a, rd1_b, read_data;
 
    // load logic 
-   assign val_in = rd; // complex input data real in top 16 bits, imaginary in bottom 16 bits
+   assign read_data = rd; // complex input data real in top 16 bits, imaginary in bottom 16 bits
    assign write_a = load ? read_data : aout; // write ram0 with input data or BFU output
    assign write_b = load ? read_data : bout;
 
@@ -31,8 +31,8 @@ module fft_top
    assign b = rd_sel ? rd1_b : rd0_b;
 
    // submodules
-   twiddle_ROM  twiddlerom(twiddleadr, twiddle);
-   fft_control_unit  fft_cu(clk, start, reset, load, rd_adr, done, rd_sel, we0, adr0_a, adr0_b, we1, adr1_a, adr1_b, twiddle_adr);
+   twiddle_ROM  twiddlerom(twiddle_adr, twiddle);
+   fft_control_unit  fft_cu(clk, reset, start, load, rd_adr, done, rd_sel, we0, we1, adr0_a, adr0_b, adr1_a, adr1_b, twiddle_adr);
 
    dual_RAM  ram0(clk, we0, adr0_a, adr0_b, write_a, write_b, rd0_a, rd0_b);
    dual_RAM  ram1(clk, we1, adr1_a, adr1_b, aout, bout, rd1_a, rd1_b);
@@ -97,5 +97,4 @@ endmodule
 		
 		
 		
-
 
