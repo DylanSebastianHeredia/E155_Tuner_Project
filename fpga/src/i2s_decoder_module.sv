@@ -31,6 +31,9 @@
   ***********************************************************************************
   */
 
+// i2s_decoder_module.sv contains code to convert a binary number into a one-hot encoded
+// vector (like a priority encoder)
+
 module i2s_decoder_module #(
 	parameter	INPUT_WIDTH	= 5,
 			OUTPUT_WIDTH	= 32
