@@ -33,12 +33,13 @@
   ***********************************************************************************
   */
 
-module i2s_cntr_module #(
-	parameter CNT_RES = 5
-)(
-	input	logic			rst_i, clk_i, en_i,
-	output	logic	[CNT_RES-1:0]	cnt_o
-);
+// i2s_cntr_module.sv contains code simple counter that adds +1 for every clk_i rising
+// edge when en_i is active HIGH
+
+module i2s_cntr_module 
+	#(parameter CNT_RES = 5)
+	(input	logic			rst_i, clk_i, en_i,
+	 output	logic	[CNT_RES-1:0]	cnt_o);
 	
 	always_ff @(posedge clk_i) begin
 		if(rst_i)
