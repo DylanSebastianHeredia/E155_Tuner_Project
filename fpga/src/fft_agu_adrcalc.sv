@@ -6,13 +6,13 @@ module fft_agu_adrcalc
     output logic [M-1:0] adr_B,
     output logic [M-2:0] twiddle_adr);
 
-   logic [M-1:0]         tempA, tempB, temptwiddle;
+   logic [M-1:0]         tempA, tempB;
    logic signed [M-1:0]  mask, sign_mask; // signed for sign extension
    
    always_comb begin
       // implement the rotations with shifting:
-      //     adrA = ROTATE_{M}(2*flyInd,     fftLevel)
-      //     adrB = ROTATE_{M}(2*flyInd + 1, fftLevel)
+      //     adrA = ROTATE_{M}(2*index,     level)
+      //     adrB = ROTATE_{M}(2*index + 1, level)
       tempA = index << 1'd1;
       tempB = tempA  +  1'd1;
       adr_A  = ((tempA << level) | (tempA >> (M - level)));
@@ -20,10 +20,9 @@ module fft_agu_adrcalc
 
       // replication operator to create the mask that gets shifted
       // (mask out the  last n-1-i least significant bits of flyInd)
-      mask       = {1'b1, {M-1{1'b0}} };
-      sign_mask      = mask >>> level;
-      temptwiddle = sign_mask & index;     // twiddle_adr // internal 
-	  twiddle_adr = temptwiddle[7:0];
+      mask        = {1'b1, {M-1{1'b0}}};
+      sign_mask   = mask >>> level;
+      twiddle_adr = sign_mask & index;     // twiddle_adr // internal 
    end
    
 endmodule
