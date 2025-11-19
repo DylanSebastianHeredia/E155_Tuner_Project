@@ -33,6 +33,9 @@
   ***********************************************************************************
   */
 
+//  i2s_full_sync_dff_module.sv contains a synchronizer (flip-flop) that has a synchronous 
+// reset and an enable.
+
 module i2s_full_sync_dff_module
 (
 	input	logic d_i, rst_i, en_i, clk_i,
