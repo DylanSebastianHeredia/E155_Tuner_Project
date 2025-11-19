@@ -1,5 +1,5 @@
 
-
+// Broderick Bownds & Sebastian Heredia
 // address generation unit (AGU).
 // counts the fft level and butterfly index within each level
 // and generates ram addresses for each butterfly operation.
