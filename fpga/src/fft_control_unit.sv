@@ -16,7 +16,7 @@ module fft_control_unit
            output logic [M-1:0] adr0_a, adr0_b, adr1_a, adr1_b,
 		   output logic [M-2:0] twiddle_adr);
 
-// Control Unit is responsibnel for all the sequential logic for perfomring the FFT (A.V. p.529)
+// Control Unit is responsible for all the sequential logic for performing the FFT (A.V. p.529)
  // pulsed start -> enable hold logic
    logic  enable;
    
@@ -68,4 +68,4 @@ module fft_control_unit
       we0   = load | we0_agu;
    end
   
-endmodule
+endmodule 
