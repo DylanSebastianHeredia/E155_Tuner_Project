@@ -2,7 +2,7 @@
 
 
 module fft_top
-  #(parameter width=16, M=5)
+  #(parameter width=16, M=9)
    (input logic                clk,    // clock
     input logic                reset,  // reset
     input logic                start,  // pulse once loading is complete to begin calculation.
@@ -30,71 +30,73 @@ module fft_top
    assign a = rd_sel ? rd1_a : rd0_a;
    assign b = rd_sel ? rd1_b : rd0_b;
 
-   // submodules
-   twiddle_ROM  twiddlerom(twiddle_adr, twiddle);
+   // submodules   
+   
+   twiddle_ROM twiddlerom(
+		.rd_clk_i(clk), 
+        .rst_i(1'b0), 
+        .rd_en_i(1'b1), 
+        .rd_clk_en_i(1'b1), 
+        .rd_addr_i(twiddle_adr),
+        .rd_data_o(twiddle)) ;
+		
    fft_control_unit  fft_cu(clk, reset, start, load, rd_adr, done, rd_sel, we0, we1, adr0_a, adr0_b, adr1_a, adr1_b, twiddle_adr);
 
-   dual_RAM  ram0(clk, we0, adr0_a, adr0_b, write_a, write_b, rd0_a, rd0_b);
-   dual_RAM  ram1(clk, we1, adr1_a, adr1_b, aout, bout, rd1_a, rd1_b);
+   dual_RAM  ram0_a( 
+		.wr_clk_i(clk), 
+        .rd_clk_i(clk), 
+        .rst_i(reset), 
+        .wr_clk_en_i(1'b1), 
+        .rd_en_i(we0), 
+        .rd_clk_en_i(1'b1), 
+        .wr_en_i(we0), 
+        .wr_data_i(write_a), 
+        .wr_addr_i(adr0_a), 
+        .rd_addr_i(adr0_a), 
+        .rd_data_o(rd0_a) );
+		
+   dual_RAM  ram0_b( 
+		.wr_clk_i(clk), 
+        .rd_clk_i(clk), 
+        .rst_i(reset), 
+        .wr_clk_en_i(1'b1), 
+        .rd_en_i(we0), 
+        .rd_clk_en_i(1'b1), 
+        .wr_en_i(we0), 
+        .wr_data_i(write_b), 
+        .wr_addr_i(adr0_b), 
+        .rd_addr_i(adr0_b), 
+        .rd_data_o(rd0_b) );
+	
+	dual_RAM  ram1_a( 
+		.wr_clk_i(clk), 
+        .rd_clk_i(clk), 
+        .rst_i(reset), 
+        .wr_clk_en_i(1'b1), 
+        .rd_en_i(we1), 
+        .rd_clk_en_i(1'b1), 
+        .wr_en_i(we1), 
+        .wr_data_i(aout), 
+        .wr_addr_i(adr1_a), 
+        .rd_addr_i(adr1_a), 
+        .rd_data_o(rd1_a));
+		
+	dual_RAM  ram1_b( 
+		.wr_clk_i(clk), 
+        .rd_clk_i(clk), 
+        .rst_i(reset), 
+        .wr_clk_en_i(1'b1), 
+        .rd_en_i(we1), 
+        .rd_clk_en_i(1'b1), 
+        .wr_en_i(we1), 
+        .wr_data_i(bout), 
+        .wr_addr_i(adr1_b), 
+        .rd_addr_i(adr1_b), 
+        .rd_data_o(rd1_b));
+   
 
    fft_butterfly fft_bfu(twiddle, a, b, aout, bout);
 
 endmodule
 
-// Broderick Bownds & Sebastian Heredia
-// brbownds@hmc.edu, dheredia@hmc.edu
-// 11/12/2025
-
-// fft_butterfly.sv
-// This module contains the math portion of the FFT processor other than mult adn complex_mult
-// and computes the imaginary and real parts of aout and bout to write into RAM0 and RAM1.
-
-module fft_butterfly
-	#(parameter bit_width = 16)
-			(input logic signed  [2*bit_width - 1:0] twiddle,  // this is the input to the twiddle ROM's output will write up later
-			 input logic signed  [2*bit_width - 1:0] a,
-			 input logic signed  [2*bit_width - 1:0] b,
-			 output logic signed [2*bit_width - 1:0] aout,
-			 output logic signed [2*bit_width - 1:0] bout);
-		
-// These internal logic signals are the outputs when we multiply twiddle (wk)*b = temporary variables, 
-// actually might not even need this because complex_mult takes care of it in its module
-		logic signed [2*bit_width - 1:0] temp;
-		logic signed [bit_width - 1:0] a_re, a_im, b_re, b_im, temp_re, temp_im;
-		logic signed [bit_width - 1:0] aout_re, aout_im, bout_re, bout_im;
-
-		complex_mult mult_bfu_1 (b, twiddle, temp); // output should be 2*bit_width where temp = {re,im}
-	
-		assign a_re = a[2*bit_width-1: bit_width];
-		assign a_im = a[bit_width-1: 0];
-		
-		assign b_re = b[2*bit_width-1: bit_width];
-		assign b_im = b[bit_width-1: 0];
-		
-		assign temp_re = temp[2*bit_width-1: bit_width];
-		assign temp_im = temp[bit_width-1: 0];
-		
-// after initializing real and imaginary parts we can then move forward with
-// the math portion of the BFU where aout = a + wk *b, bout = a - wk*b. but first to go in
-// order we must compute tw * b where tw and b contain both real and imaginary parts. 
-		
-		// Then compute the adders/subtracters where we have 
-		// aout_re = a_re + temp_re ;  aout_im = a_im + temp_im
-		// bout_re = b_re - temp_re ;  bout_im = b_im - temp_im
-		
-		assign aout_re = a_re + temp_re;
-		assign aout_im = a_im + temp_im;
-		
-		assign bout_re = a_re - temp_re;
-		assign bout_im = a_im - temp_im;
-		
-		// cacanate 
-		assign aout = {aout_re, aout_im};
-		assign bout = {bout_re, bout_im};
-		
-endmodule
-		
-		
-		
-		
 
