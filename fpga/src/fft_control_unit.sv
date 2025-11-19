@@ -6,7 +6,7 @@
 
 module fft_control_unit 
         #(parameter bit_width = 16,
-          parameter N = 32,
+          parameter N = 512,
           parameter M = $clog2(N))
           
           (input  logic clk, reset,
@@ -75,7 +75,7 @@ endmodule
 // and generates ram addresses for each butterfly operation.
 // also handles ping-pong control based on fft level.
 module fft_agu
-  #(parameter width=16, M=5)
+  #(parameter width=16, M=9)
    (input logic            clk,
     input logic            enable,
     input logic            reset,
@@ -125,7 +125,7 @@ endmodule
 // and the masking to generate the twiddle addresses.
 
 module fft_agu_adrcalc
-  #(parameter width=16, M=5)
+  #(parameter width=16, M=9)
    (input logic  [M-1:0] level,
     input logic  [M-1:0] index,
     output logic [M-1:0] adr_A,
@@ -152,4 +152,6 @@ module fft_agu_adrcalc
    end
    
 endmodule
+
+
 
