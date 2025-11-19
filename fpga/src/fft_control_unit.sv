@@ -7,7 +7,7 @@
 module fft_control_unit 
         #(parameter bit_width = 16,
           parameter N = 512,
-          parameter M = $clog2(N))
+          parameter M = 9)
           
           (input  logic clk, reset,
            input  logic start, load,      // Note: Done is asserted when the computation is finished
@@ -68,90 +68,4 @@ module fft_control_unit
       we0   = load | we0_agu;
    end
   
-endmodule 
-
-// address generation unit (AGU).
-// counts the fft level and butterfly index within each level
-// and generates ram addresses for each butterfly operation.
-// also handles ping-pong control based on fft level.
-module fft_agu
-  #(parameter width=16, M=9)
-   (input logic            clk,
-    input logic            enable,
-    input logic            reset,
-    input logic            load,
-    output logic           done,
-    output logic           rd_sel,
-    output logic           we0,
-    output logic           we1,
-    output logic [M-1:0] adr_A,
-    output logic [M-1:0] adr_B,
-    output logic [M-2:0] twiddle_adr);
-
-   logic [M-1:0]         level = 0;
-   logic [M-1:0]         index = 0;
-   
-   // count fftLevel and flyInd
-   always_ff @(posedge clk) begin
-      if (reset) begin
-         level <= 0;
-         index <= 0;
-      end
-      else if(enable === 1 & ~done) begin
-         if(index < 2**(M - 1) - 1) begin
-            index <= index + 1'd1;
-         end else begin
-            index <= 0;
-            level <= level + 1'd1;
-         end
-      end
-   end // always_ff @ (posedge clk)
-
-   // sets done when we are finished with the FFT
-   assign done = (level == (M));
-   
-   fft_agu_adrcalc adrcalc(level, index, adr_A, adr_B, twiddle_adr);
-
-   // ping-pong logic that flips every level:
-   assign rd_sel = level[0];
-   assign we0 =   level[0] & enable;
-   assign we1 =  ~level[0] & enable;
-
 endmodule
-
-// AGU address calculation unit.
-// given FFT level and butterfly index, performs the proper
-// rotations to generate the BFU input A and B addresses,
-// and the masking to generate the twiddle addresses.
-
-module fft_agu_adrcalc
-  #(parameter width=16, M=9)
-   (input logic  [M-1:0] level,
-    input logic  [M-1:0] index,
-    output logic [M-1:0] adr_A,
-    output logic [M-1:0] adr_B,
-    output logic [M-2:0] twiddle_adr);
-
-   logic [M-1:0]         tempA, tempB;
-   logic signed [M-1:0]  mask, sign_mask; // signed for sign extension
-   
-   always_comb begin
-      // implement the rotations with shifting:
-      //     adrA = ROTATE_{M}(2*flyInd,     fftLevel)
-      //     adrB = ROTATE_{M}(2*flyInd + 1, fftLevel)
-      tempA = index << 1'd1;
-      tempB = tempA  +  1'd1;
-      adr_A  = ((tempA << level) | (tempA >> (M - level)));
-      adr_B  = ((tempB << level) | (tempB >> (M - level)));
-
-      // replication operator to create the mask that gets shifted
-      // (mask out the  last n-1-i least significant bits of flyInd)
-      mask       = {1'b1, {M-1{1'b0}} };
-      sign_mask      = mask >>> level;
-      twiddle_adr = sign_mask & index;     // twiddle_adr = 4-bits
-   end
-   
-endmodule
-
-
-
