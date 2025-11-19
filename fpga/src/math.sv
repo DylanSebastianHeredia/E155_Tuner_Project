@@ -8,19 +8,20 @@
 // This module mult breaks down the basics of multiplying two fractionals 16-bit width numbers
 // where the msb if the signed bit and the rest are fractional bits
 module mult	
-	#(parameter bit_width = 16)
-		   (input logic signed  [bit_width - 1:0] a,
-			input logic signed  [bit_width - 1:0] b,
-			output logic signed [bit_width - 1:0] out);
-			
-		logic [2*bit_width - 1:0] mult_a_b;
-		
-		assign mult_a_b = a * b; // multiplying two fractional bits with width 16 bits to 
-								// get out a 32-bit result then we scale back by 2^15 to get 
-								// a number with 16-bit result and a rounding factor. 
-		// assign mult_a_b = mult_a_b_unround[2*bit_width-2:bit_width-1];
-		assign out = mult_a_b[2*bit_width-2:bit_width-1] + mult_a_b[bit_width - 2];
-		
+    #(parameter bit_width = 16)
+    (	input  logic signed [bit_width - 1:0] a,
+        input  logic signed [bit_width - 1:0] b,
+        output logic signed [bit_width - 1:0] out);
+
+    logic signed [2*bit_width - 1:0] mult_a_b;
+
+    // full 32-bit multiply of Q1.15 × Q1.15 = Q2.30
+    assign mult_a_b = a * b;
+
+    // Correct Q1.15 result = bits [30:15], i.e. [2*bit_width-2 : bit_width-1]
+    // Add rounding bit at [bit_width-2] = bit 14
+    assign out = mult_a_b[2*bit_width-2 : bit_width-1] + mult_a_b[bit_width-2];
+
 endmodule
 
 // This is the module where the FOIL comes into play for multiplying complex numbers in the form of 
