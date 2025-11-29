@@ -15,7 +15,8 @@ module fft_master #(
     input  logic bck_i,      // I2S bit clock
     input  logic lrck_i,     // I2S left-right clock
     input  logic dat_i,      // I2S data line
-    output logic done        // FFT done signal
+    output logic done,        // FFT done signal
+	output logic wd
 );
 
 
