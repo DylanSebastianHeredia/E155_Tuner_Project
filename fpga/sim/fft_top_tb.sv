@@ -2,12 +2,10 @@
 
 module tb_fft_top;
 
-   // Parameters
    localparam bit_width = 16;
    localparam M = 9;
    localparam N = 512;
 
-   // DUT I/O
    logic clk;
    logic reset;
    logic start;
@@ -17,10 +15,9 @@ module tb_fft_top;
    logic [2*bit_width-1:0] wd;
    logic done;
 
-   // Memory to hold input samples from file
    logic [2*bit_width-1:0] sample_mem [0:N-1];
 
-   // Instantiate DUT
+   // DUT
    fft_top #(bit_width, M, N) dut (
       .clk(clk),
       .reset(reset),
@@ -32,54 +29,59 @@ module tb_fft_top;
       .done(done)
    );
 
-   // Clock generator
+   // Clock
    initial begin
       clk = 0;
       forever #5 clk = ~clk;
    end
 
-   // Load file + stimulus
+   // Stimulus
    initial begin
-      // 1. Load input samples from file
-      $display("Loading input samples...");
-      // $readmemh("C:/Users/dheredia/Desktop/fft_top/source/fft_top/note_amplitude_hex_v2.txt", sample_mem);
-	  $readmemh("C:/Users/dheredia/Desktop/fft_top/source/fft_top/sine_wave_100hz_hex.txt", sample_mem);
+      integer k;
 
-      // 2. Apply reset
+      // Load input samples
+      $display("Loading samples...");
+      $readmemh("note_amplitude_hex_v2.txt", sample_mem);
+
+      // Reset
       reset = 1;
       start = 0;
       load = 0;
       rd_adr = 0;
-      rd = 0;
-      #20;
+      rd = '0;
+      repeat(3) @(posedge clk);
       reset = 0;
 
-      // 3. LOAD PHASE (write RAM0 with input samples)
-      $display("Loading samples into FFT RAM...");
-
-      for (int i = 0; i < N; i++) begin
+      // LOAD PHASE
+      $display("Writing samples into RAM0...");
+      for (k = 0; k < N; k++) begin
+         @(posedge clk);
          load = 1;
-         rd_adr = i;
-         rd = sample_mem[i];   // drive rd only when load=1
-         #10;
+         rd_adr = k;
+         rd = sample_mem[k];
       end
-
+      @(posedge clk);
       load = 0;
+      rd = '0;        // <—— important cleanup
 
-      // 4. START FFT
-      $display("Starting FFT computation...");
+      // START FFT
+      @(posedge clk);
       start = 1;
-      #10;
-      start = 0;  // start is a pulse
+      @(posedge clk);
+      start = 0;
 
-      // 5. WAIT FOR DONE
-      wait (done == 1);
-      $display("FFT finished.");
+      // WAIT FOR DONE
+      wait(done);
+      $display("FFT DONE asserted.");
 
-      // 6. Read output (wd)
+      // *** GIVE THE RAM TIME TO OUTPUT VALID DATA ***
+      @(posedge clk);
+      @(posedge clk);
+
+      // READ FFT OUTPUT
       $display("Dumping FFT output:");
-      for (int k = 0; k < N; k++) begin
-         #10;
+      for (k = 0; k < N; k++) begin
+         @(posedge clk);
          $display("out[%0d] = %h", k, wd);
       end
 
