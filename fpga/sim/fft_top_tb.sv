@@ -42,7 +42,8 @@ module tb_fft_top;
    initial begin
       // 1. Load input samples from file
       $display("Loading input samples...");
-      $readmemh("note_amplitude_hex_v2.txt", sample_mem);
+      // $readmemh("C:/Users/dheredia/Desktop/fft_top/source/fft_top/note_amplitude_hex_v2.txt", sample_mem);
+	  $readmemh("C:/Users/dheredia/Desktop/fft_top/source/fft_top/sine_wave_100hz_hex.txt", sample_mem);
 
       // 2. Apply reset
       reset = 1;
