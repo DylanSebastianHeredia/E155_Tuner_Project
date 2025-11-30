@@ -41,7 +41,7 @@ module tb_fft_top;
 
       // Load input samples
       $display("Loading samples...");
-      $readmemh("note_amplitude_hex_v2.txt", sample_mem);
+      $readmemh("C:/Users/dheredia/Desktop/fft_top/source/fft_top/hw_rd_copy.txt", sample_mem);
 
       // Reset
       reset = 1;
