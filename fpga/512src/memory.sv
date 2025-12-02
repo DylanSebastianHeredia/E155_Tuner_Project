@@ -27,7 +27,7 @@ module twiddle_rom (input logic clk,
    // twiddle factors are generated with msb on left side
    logic [31:0] mem [0:255];
 
-   initial   $readmemh("C:/Users/broderickbowndz/Documents/E155 Labs/fft_DONE/fft_top/twiddle512.hex", mem);
+   initial   $readmemh("C:/Users/dheredia/Desktop/fft/source/impl_1/twiddle512.hex", mem);
 	
 	// Synchronous version
 	always_ff @(posedge clk) begin
