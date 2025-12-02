@@ -1,69 +1,164 @@
-module fft_spi (
-    input  logic sck, sdi, reset,
-    output logic sdo,
-    input  logic clk, // System clock
-    
-    // Interface to FFT Controller
-    output logic [31:0] data_to_fft,
-    input  logic [31:0] data_from_fft,
-    input  logic [8:0]  fft_read_addr,  // Was [5:0], now [8:0]
-    input  logic [8:0]  fft_write_addr, // Was [5:0], now [8:0]
-    input  logic        fft_write_en,
-    output logic        start_fft
+//------------------------------------------------------------------------------
+// fft_in_flop_noSPI
+// Receives 32-bit samples (already assembled from I2S left channel)
+// Stores exactly 512 samples, then asserts buffer_full
+// Cleared between frames by clear_frame from fft.sv
+//------------------------------------------------------------------------------
+module fft_in_flop_noSPI (
+    input  logic        clk,
+    input  logic        reset,
+
+    // From I2S module / fft_master
+    input  logic [31:0] sample_in,       // 32-bit audio sample
+    input  logic        sample_valid,    // 1-cycle pulse per new sample
+
+    // From FFT top: clear this buffer between frames
+    input  logic        clear_frame,     // asserted while we want to reset buffer
+
+    // To FFT controller
+    input  logic [8:0]  fft_read_addr,   // address FFT uses during LOAD
+    output logic [31:0] data_to_fft,     // data read by FFT
+
+    output logic        buffer_full      // 512 samples collected
 );
 
-    // 1. SPI Deserializer (Shift register for just 1 word)
-    logic [31:0] spi_shift_reg;
-    logic [4:0]  bit_cnt;
-    logic [8:0]  word_cnt; // Counts up to 512 words
-    logic        word_done;
+    logic [8:0] write_ptr;
+    logic       ram_write_en;
 
-    // 2. Input Buffer (RAM 512 x 32)
-    logic        buf_we;
-    logic [31:0] buf_q;
-    // We reuse your existing 'ram' module but size it for 512
+    //-------------------------
+    // 512 × 32-bit RAM
+    //-------------------------
     ram input_ram (
-        .clk(clk), 
-        .write(buf_we),
-        .write_address(word_cnt), 
-        .read_address(fft_read_addr), 
-        .d(spi_shift_reg), 
-        .q(data_to_fft)
+        .clk           (clk),
+        .write         (ram_write_en),
+        .write_address (write_ptr),
+        .read_address  (fft_read_addr),
+        .d             (sample_in),
+        .q             (data_to_fft)
     );
 
-    // SPI Input Logic
-    always_ff @(posedge sck or posedge reset) begin
-        if (reset) begin
-            bit_cnt <= 0;
-            word_cnt <= 0;
-            start_fft <= 0;
+    //-------------------------
+    // Write logic
+    //-------------------------
+    always_ff @(posedge clk or posedge reset) begin
+        if (reset || clear_frame) begin
+            write_ptr    <= 9'd0;
+            buffer_full  <= 1'b0;
+            ram_write_en <= 1'b0;
         end else begin
-            spi_shift_reg <= {spi_shift_reg[30:0], sdi};
-            bit_cnt <= bit_cnt + 1;
-            
-            if (bit_cnt == 31) begin
-                buf_we <= 1; // Pulse write to RAM
-                word_cnt <= word_cnt + 1;
-                if (word_cnt == 511) start_fft <= 1; // Trigger FFT when full
-            end else begin
-                buf_we <= 0;
+            ram_write_en <= 1'b0;
+
+            // Only accept samples until we've filled 512 slots
+            if (sample_valid && !buffer_full) begin
+                ram_write_en <= 1'b1;
+
+                if (write_ptr == 9'd511) begin
+                    write_ptr   <= write_ptr; // stay at 511
+                    buffer_full <= 1'b1;
+                end else begin
+                    write_ptr <= write_ptr + 9'd1;
+                end
             end
         end
     end
-    
-    // 3. Output Buffer (RAM 512 x 32)
-    // The FFT controller writes results here, SPI reads them out
-    logic [31:0] out_spi_data;
+
+endmodule
+
+
+
+module fft_out_flop (
+    input  logic        clk,
+    input  logic        reset,
+
+    input  logic [31:0] data_from_fft,
+    input  logic [8:0]  fft_write_addr,
+    input  logic        fft_write_en,
+
+    input  logic [8:0]  spi_read_addr,
+    output logic [31:0] spi_read_data,
+
+    input  logic        clear_buffer,
+    output logic        buffer_ready
+);
+
     ram output_ram (
         .clk(clk),
         .write(fft_write_en),
         .write_address(fft_write_addr),
-        .read_address(word_cnt), // SPI reads using same counter
+        .read_address(spi_read_addr),
         .d(data_from_fft),
-        .q(out_spi_data)
+        .q(spi_read_data)
     );
 
-    // Output Serialization (simplified)
-    assign sdo = out_spi_data[31 - bit_cnt]; 
+    always_ff @(posedge clk or posedge reset) begin
+        if (reset)
+            buffer_ready <= 1'b0;
+        else if (clear_buffer)
+            buffer_ready <= 1'b0;
+        else if (fft_write_en && fft_write_addr == 9'd511)
+            buffer_ready <= 1'b1;
+    end
+
+endmodule
+
+
+module fft_spi_out (
+    input  logic        sck,
+    input  logic        reset,
+
+    input  logic        buffer_ready,
+    output logic [8:0]  spi_read_addr,
+    input  logic [31:0] spi_read_data,
+    output logic        clear_buffer,
+
+    output logic        sdo
+);
+
+    logic [31:0] shift_reg;
+    logic [4:0]  bit_cnt;
+    logic [8:0]  word_cnt;
+    logic        buffer_active;
+
+    assign spi_read_addr = word_cnt;
+
+    always_ff @(posedge sck or posedge reset) begin
+        if (reset) begin
+            shift_reg     <= 32'd0;
+            bit_cnt       <= 5'd0;
+            word_cnt      <= 9'd0;
+            buffer_active <= 1'b0;
+            clear_buffer  <= 1'b0;
+            sdo           <= 1'b0;
+        end else begin
+            clear_buffer <= 1'b0;
+
+            if (!buffer_active) begin
+                if (buffer_ready) begin
+                    buffer_active <= 1'b1;
+                    bit_cnt  <= 5'd0;
+                    word_cnt <= 9'd0;
+                    shift_reg <= spi_read_data;
+                end
+            end else begin
+                sdo       <= shift_reg[31];
+                shift_reg <= {shift_reg[30:0], 1'b0};
+
+                if (bit_cnt == 5'd31) begin
+                    bit_cnt <= 5'd0;
+
+                    if (word_cnt == 9'd511) begin
+                        word_cnt      <= 9'd0;
+                        buffer_active <= 1'b0;
+                        clear_buffer  <= 1'b1;
+                    end else begin
+                        word_cnt  <= word_cnt + 9'd1;
+                        shift_reg <= spi_read_data;
+                    end
+                end else begin
+                    bit_cnt <= bit_cnt + 5'd1;
+                end
+            end
+        end
+    end
 
 endmodule
