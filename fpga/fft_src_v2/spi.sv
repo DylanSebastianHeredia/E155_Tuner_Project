@@ -31,10 +31,10 @@ module fft_in_flop_noSPI (
     ram input_ram (
         .clk           (clk),
         .write         (ram_write_en),
-        .write_address (write_ptr),
-        .read_address  (fft_read_addr),
-        .d             (sample_in),
-        .q             (data_to_fft)
+        .wadr (write_ptr),
+        .radr  (fft_read_addr),
+        .wd             (sample_in),
+        .rd             (data_to_fft)
     );
 
     //-------------------------
@@ -84,10 +84,10 @@ module fft_out_flop (
     ram output_ram (
         .clk(clk),
         .write(fft_write_en),
-        .write_address(fft_write_addr),
-        .read_address(spi_read_addr),
-        .d(data_from_fft),
-        .q(spi_read_data)
+        .wadr(fft_write_addr),
+        .radr(spi_read_addr),
+        .wd(data_from_fft),
+        .rd(spi_read_data)
     );
 
     always_ff @(posedge clk or posedge reset) begin
