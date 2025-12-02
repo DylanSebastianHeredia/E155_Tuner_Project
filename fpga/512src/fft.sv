@@ -4,17 +4,22 @@ module fft (
     input  logic sdi, 
     input  logic reset, 
     input  logic full_reset,
-    input  logic clk,      // System Clock (e.g. 48MHz from HFOSC)
+    // input  logic clk,      // System Clock (e.g. 48MHz from HFOSC)
     output logic sdo, 
     output logic done      // Debug/Status LED
 );
 
-    // =========================================================================
-    // 1. Clock Generation
-    // =========================================================================
+    
+    // Clock Generation
+
     logic [1:0] clk_counter = 0;
-    logic ram_clk;
-    logic slow_clk;
+    // logic ram_clk;
+    // logic slow_clk;
+	logic clk;
+
+	HSOSC #(.CLKHF_DIV ("0b10")) 
+		hf_osc (.CLKHFPU(1'b1), .CLKHFEN(1'b1), .CLKHF(clk));
+
 
     always_ff @(posedge clk) begin
         clk_counter <= clk_counter + 1'b1;
@@ -23,9 +28,8 @@ module fft (
     assign ram_clk = clk_counter[0]; // Half speed
     assign slow_clk = clk_counter[1]; // Quarter speed
 
-    // =========================================================================
-    // 2. Wires & Interfaces
-    // =========================================================================
+    // Wires & Interfaces
+
     
     // Signals between SPI Buffer and FFT Controller
     logic [31:0] spi_to_fft_data;
@@ -51,11 +55,11 @@ module fft (
     
     logic [8:0] load_ptr;
 
-    // =========================================================================
-    // 3. Module Instantiations
-    // =========================================================================
 
-    // NEW: RAM-Based SPI Buffer
+    // Module Instantiations
+
+
+    // RAM-Based SPI Buffer
     // Ensure "spi_fft_buffer.sv" is included in your project sources!
     fft_spi spi_inst (
         .sck(sck), 
@@ -88,9 +92,8 @@ module fft (
         .data_out(fft_data_out)
     );
 
-    // =========================================================================
-    // 4. Control Logic (The "Traffic Cop")
-    // =========================================================================
+  
+    // Control Logic (The "Traffic Cop")
 
     // State Transition
     always_ff @(posedge slow_clk or posedge reset) begin
