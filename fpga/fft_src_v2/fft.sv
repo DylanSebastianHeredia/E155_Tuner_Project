@@ -65,7 +65,7 @@ module fft (
         .reset        (reset),
         .start        (fft_start),
         .load         (fft_load),
-        .load_address (fft_load_addr),
+        .load_adr     (fft_load_addr),
         .data_in      (data_to_fft),
         .done         (fft_done_core),
         .processing   (fft_processing),
