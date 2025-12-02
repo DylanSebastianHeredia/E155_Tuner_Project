@@ -48,9 +48,9 @@ control dut (
    // start of test: load `input_data`, `expected_out`, open output file, reset fft module.
    initial
      begin
-	$readmemh("C:/Users/broderickbowndz/Documents/E155 Labs/fft_DONE/fft_top/test_in (1).memh", input_data);
-	$readmemh("C:/Users/broderickbowndz/Documents/E155 Labs/fft_DONE/fft_top/gt_test_out (1).memh", expected_out);
-        f = $fopen("C:/Users/broderickbowndz/Documents/E155 Labs/fft_DONE/fft_top/test_out.memh", "w"); // write computed values.
+	$readmemh("C:/Users/dheredia/Desktop/simulation/modelsim/rom/test_in.memh", input_data);
+	$readmemh("C:/Users/dheredia/Desktop/simulation/modelsim/rom/gt_test_out.memh", expected_out);
+        f = $fopen("C:/Users/dheredia/Desktop/simulation/modelsim/rom/test_out.memh", "w"); // write computed values.
 	idx=0; reset=1; #40; reset=0;
      end	
    // increment testbench counter and derive load/start signals
