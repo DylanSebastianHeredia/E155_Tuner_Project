@@ -5,7 +5,7 @@ module fft_master (
     output logic done,
     output logic sdo,
     output logic bck_i,
-	output logic lrck_i
+    output logic lrck_i
 );
 
     // ===========================================================
@@ -18,13 +18,12 @@ module fft_master (
         .CLKHF   (clk)
     );
 
-    // assign sck = clk;  // SPI-out clock
-
     // ===========================================================
     // I2S Clock Generators
     // ===========================================================
-    logic bck_i;
-    logic lrck_i;
+
+    // DO NOT redeclare bck_i or lrck_i here!
+    // They are already outputs.
 
     // Generate 3 MHz BCK from 48 MHz
     i2s_clkgen_bck #(
@@ -98,5 +97,3 @@ module fft_master (
     assign sdo = sdo_int;
 
 endmodule
-
-
