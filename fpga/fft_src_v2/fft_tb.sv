@@ -22,7 +22,7 @@ control dut (
     .reset(reset), 
     .start(start), 
     .load(load), 
-    .load_address(rd_adr),  // Connects rd_adr (TB) to load_address (Module)
+    .load_adr(rd_adr),  // Connects rd_adr (TB) to load_address (Module)
     .data_in(rd),           // Connects rd (TB) to data_in (Module)
     .done(done), 
     .processing(),          // Output unused in TB, leave unconnected
