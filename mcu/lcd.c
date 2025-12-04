@@ -1,8 +1,12 @@
 #include "STM32L432KC_GPIO.h"
 #include "STM32L432KC_RCC.h"
-#include <stdint.h>
-#include "main_lcd.h"
+#include "lcd.h"           
 
+#include <stdint.h>
+
+//====================================================================
+// Internal utility
+//====================================================================
 static void lcd_delay_us(volatile uint32_t n) {
     while (n--) {
         __asm__("nop");
@@ -28,6 +32,9 @@ static void lcd_write_4bit(uint8_t nib) {
     lcd_pulse_enable();
 }
 
+//====================================================================
+// Public LCD API
+//====================================================================
 void lcd_send_cmd(uint8_t cmd) {
     lcd_write_pin(LCD_RS, 0);
     lcd_write_4bit(cmd >> 4);
@@ -102,54 +109,34 @@ void lcd_write_char(char c) {
 }
 
 void lcd_create_char(uint8_t location, uint8_t pattern[8]) {
-    location &= 0x07; // Only slots 0–7
-    lcd_send_cmd(0x40 | (location << 3));  // Set CGRAM address to slot*8
+    location &= 0x07;
+    lcd_send_cmd(0x40 | (location << 3));
 
     for (int i = 0; i < 8; i++) {
         lcd_send_data(pattern[i]);
     }
 }
 
-// ==========================
-// main.c (integrated)
-// ==========================
+//====================================================================
+// OPTIONAL HELPER (makes display_frequency very clean)
+//====================================================================
+void lcd_print_number(uint16_t num) {
+    char buf[8];
+    int idx = 0;
 
-uint8_t flat_char[8] = {
-    0b00100,
-    0b00100,
-    0b00100,
-    0b00110,
-    0b00101,
-    0b00101,
-    0b00110,
-    0b00000
-};
+    if (num == 0) {
+        lcd_write_char('0');
+        return;
+    }
 
-int main(void) {
+    while (num > 0 && idx < 7) {
+        buf[idx++] = '0' + (num % 10);
+        num /= 10;
+    }
 
-    gpioEnable(GPIO_PORT_A);
-
-    lcd_init();
-    
- // load flat symbol into slot 0
-    lcd_create_char(0, flat_char);
-
-    lcd_set_cursor(0, 1);
-    lcd_print("Note: A4");     // prints B
-    lcd_write_char(0);    // prints flat sign
-
-    lcd_set_cursor(4, 0);
-    lcd_print("Freq:1000 Hz");
-
-    lcd_set_cursor(10, 1);
-    lcd_print("Cents:+0");
-
-    while (1) { }
-
-    return 0;
+    while (idx--) {
+        lcd_write_char(buf[idx]);
+    }
 }
-
-
-
 
 
