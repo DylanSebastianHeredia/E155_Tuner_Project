@@ -1,11 +1,13 @@
 module fft_master (
+	input logic sck,
     input  logic sd_in,
     input  logic reset,
-
+	input  logic cs, // for the MCU Chip select
     output logic done,
     output logic sdo,
     output logic bck_i,
-    output logic lrck_i
+    output logic lrck_i,
+	output logic LED0, LED1
 );
 
     // ===========================================================
@@ -85,15 +87,19 @@ module fft_master (
     logic sdo_int;
 
     fft fft_inst (
-        .sck          (clk),
+        .sck          (sck),
         .reset        (reset),
+		.cs           (cs),
         .clk          (clk),
         .sample_in    (sample32),
         .sample_valid (sample_valid),
         .sdo          (sdo_int),
         .done         (done)
     );
-
+	assign LED0 = bck_i;
+	assign LED1 = lrck_i;
     assign sdo = sdo_int;
 
 endmodule
+
+
