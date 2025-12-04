@@ -1,70 +1,3 @@
-//------------------------------------------------------------------------------
-// fft_in_flop_noSPI
-// Receives 32-bit samples (already assembled from I2S left channel)
-// Stores exactly 512 samples, then asserts buffer_full
-// Cleared between frames by clear_frame from fft.sv
-//------------------------------------------------------------------------------
-module fft_in_flop_noSPI (
-    input  logic        clk,
-    input  logic        reset,
-
-    // From I2S module / fft_master
-    input  logic [31:0] sample_in,       // 32-bit audio sample
-    input  logic        sample_valid,    // 1-cycle pulse per new sample
-
-    // From FFT top: clear this buffer between frames
-    input  logic        clear_frame,     // asserted while we want to reset buffer
-
-    // To FFT controller
-    input  logic [8:0]  fft_read_addr,   // address FFT uses during LOAD
-    output logic [31:0] data_to_fft,     // data read by FFT
-
-    output logic        buffer_full      // 512 samples collected
-);
-
-    logic [8:0] write_ptr;
-    logic       ram_write_en;
-
-    //-------------------------
-    // 512 × 32-bit RAM
-    //-------------------------
-    ram input_ram (
-        .clk           (clk),
-        .write         (ram_write_en),
-        .wadr (write_ptr),
-        .radr  (fft_read_addr),
-        .wd             (sample_in),
-        .rd             (data_to_fft)
-    );
-
-    //-------------------------
-    // Write logic
-    //-------------------------
-    always_ff @(posedge clk or posedge reset) begin
-        if (reset || clear_frame) begin
-            write_ptr    <= 9'd0;
-            buffer_full  <= 1'b0;
-            ram_write_en <= 1'b0;
-        end else begin
-            ram_write_en <= 1'b0;
-
-            // Only accept samples until we've filled 512 slots
-            if (sample_valid && !buffer_full) begin
-                ram_write_en <= 1'b1;
-
-                if (write_ptr == 9'd511) begin
-                    write_ptr   <= write_ptr; // stay at 511
-                    buffer_full <= 1'b1;
-                end else begin
-                    write_ptr <= write_ptr + 9'd1;
-                end
-            end
-        end
-    end
-
-endmodule
-
-
 
 module fft_out_flop (
     input  logic        clk,
@@ -83,7 +16,7 @@ module fft_out_flop (
 
     ram output_ram (
         .clk(clk),
-        .write(fft_write_en),
+        .we(fft_write_en),
         .wadr(fft_write_addr),
         .radr(spi_read_addr),
         .wd(data_from_fft),
@@ -102,63 +35,70 @@ module fft_out_flop (
 endmodule
 
 
-module fft_spi_out (
-    input  logic        sck,
+module spi_fft_out (
+    input  logic        sck,        // SPI clock from MCU (master)
+    input  logic        cs,         // ACTIVE LOW chip select from MCU
     input  logic        reset,
-
-    input  logic        buffer_ready,
-    output logic [8:0]  spi_read_addr,
-    input  logic [31:0] spi_read_data,
-    output logic        clear_buffer,
-
-    output logic        sdo
+    input  logic        clk,        // system clock (unused)
+    input  logic [31:0] fft_data,   // word from fft_out_flop
+    output logic [8:0]  spi_addr,   // read address into fft_out_flop
+    output logic        sdo         // goes to MCU MISO
 );
 
+    // =========================================================================
+    // Internal
+    // =========================================================================
     logic [31:0] shift_reg;
-    logic [4:0]  bit_cnt;
-    logic [8:0]  word_cnt;
-    logic        buffer_active;
+    logic [5:0]  bit_cnt;        // 0..31
+    logic [8:0]  word_cnt;       // 0..511
+    logic        sdo_reg;
 
-    assign spi_read_addr = word_cnt;
+    assign sdo      = (cs == 1'b0) ? sdo_reg : 1'b0;   // idle when CS high
+    assign spi_addr = word_cnt;
 
+    // =========================================================================
+    // SINGLE always_ff for counters + shifting
+    // =========================================================================
     always_ff @(posedge sck or posedge reset) begin
         if (reset) begin
-            shift_reg     <= 32'd0;
-            bit_cnt       <= 5'd0;
-            word_cnt      <= 9'd0;
-            buffer_active <= 1'b0;
-            clear_buffer  <= 1'b0;
-            sdo           <= 1'b0;
+            bit_cnt   <= 0;
+            word_cnt  <= 0;
+            shift_reg <= 0;
+
+        end else if (cs == 1'b1) begin
+            // CS high = NOT selected â†’ reset counters
+            bit_cnt   <= 0;
+            word_cnt  <= 0;
+
         end else begin
-            clear_buffer <= 1'b0;
+            // ========== CS LOW â†’ ACTIVE SPI TRANSFER ==========
 
-            if (!buffer_active) begin
-                if (buffer_ready) begin
-                    buffer_active <= 1'b1;
-                    bit_cnt  <= 5'd0;
-                    word_cnt <= 9'd0;
-                    shift_reg <= spi_read_data;
-                end
+            if (bit_cnt == 0) begin
+                // load new 32-bit word from FFT buffer
+                shift_reg <= fft_data;
+                bit_cnt   <= 6'd31;
+
             end else begin
-                sdo       <= shift_reg[31];
                 shift_reg <= {shift_reg[30:0], 1'b0};
+                bit_cnt   <= bit_cnt - 1;
 
-                if (bit_cnt == 5'd31) begin
-                    bit_cnt <= 5'd0;
-
-                    if (word_cnt == 9'd511) begin
-                        word_cnt      <= 9'd0;
-                        buffer_active <= 1'b0;
-                        clear_buffer  <= 1'b1;
-                    end else begin
-                        word_cnt  <= word_cnt + 9'd1;
-                        shift_reg <= spi_read_data;
-                    end
-                end else begin
-                    bit_cnt <= bit_cnt + 5'd1;
-                end
+                if (bit_cnt == 1)
+                    word_cnt <= word_cnt + 1;
             end
         end
     end
 
+    // =========================================================================
+    // SHIFT OUT (negedge SCK ONLY when CS low)
+    // =========================================================================
+    always_ff @(negedge sck or posedge reset) begin
+        if (reset)
+            sdo_reg <= 0;
+        else if (cs == 1'b0)
+            sdo_reg <= shift_reg[31];
+    end
+
 endmodule
+
+
+
