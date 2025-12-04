@@ -1,23 +1,25 @@
 //------------------------------------------------------------------------------
-// FFT system top
-//   sample_in/sample_valid from I2S (via fft_master)
-//   control  = your 512-pt FFT core
-//   Now supports continuous frames by resetting the input buffer each time.
+// fft.sv
+// 512-point FFT Top-Level
+// - Drives fft_control from the main clk domain
+// - Uses sample_valid directly (also in clk domain)
 //------------------------------------------------------------------------------
+
 module fft (
-    input  logic        sck,           // SPI-out clock (we'll tie to clk for now)
+    input  logic        sck,           // SPI clock from MCU
     input  logic        reset,
+	input  logic        cs,
     input  logic        clk,           // 48 MHz HFOSC clock
 
-    input  logic [31:0] sample_in,     // 32-bit I2S left sample
-    input  logic        sample_valid,  // 1-cycle pulse when sample_in is new
+    input  logic [31:0] sample_in,     // I2S audio sample (clk domain)
+    input  logic        sample_valid,  // 1-cycle pulse per sample (clk domain)
 
-    output logic        sdo,
-    output logic        done           // top-level "FFT frame processed"
+    output logic        sdo,           // SPI data-out to MCU
+    output logic        done           // Frame complete
 );
 
     // -------------------------------------------------------------------------
-    // Clock division for internal FFT timing
+    // Internal Clock Division (for fft_control / RAM)
     // -------------------------------------------------------------------------
     logic [1:0] clk_counter = 2'd0;
     logic       ram_clk;
@@ -26,30 +28,15 @@ module fft (
     always_ff @(posedge clk)
         clk_counter <= clk_counter + 2'd1;
 
-    assign ram_clk  = clk_counter[0];  // half-speed
-    assign slow_clk = clk_counter[1];  // quarter-speed
+    assign ram_clk  = clk_counter[0];  // 24 MHz
+    assign slow_clk = clk_counter[1];  // 12 MHz
 
-    // -------------------------------------------------------------------------
-    // Input buffer
-    // -------------------------------------------------------------------------
+    // Data to FFT core is just the current sample (clk domain)
     logic [31:0] data_to_fft;
-    logic [8:0]  fft_read_addr;
-    logic        buffer_full;
-    logic        clear_frame;   // NEW: clears input buffer between frames
-
-    fft_in_flop_noSPI inbuf (
-        .clk          (clk),
-        .reset        (reset),
-        .sample_in    (sample_in),
-        .sample_valid (sample_valid),
-        .clear_frame  (clear_frame),       // NEW
-        .fft_read_addr(fft_read_addr),
-        .data_to_fft  (data_to_fft),
-        .buffer_full  (buffer_full)
-    );
+    assign data_to_fft = sample_in;
 
     // -------------------------------------------------------------------------
-    // FFT core (your control.sv)
+    // FFT Core Interface
     // -------------------------------------------------------------------------
     logic        fft_load;
     logic        fft_start;
@@ -58,13 +45,13 @@ module fft (
     logic [8:0]  fft_load_addr;
     logic [31:0] fft_data_out;
 
-    control fft_core (
-        .clk          (clk),
-        .ram_clk      (ram_clk),
-        .slow_clk     (slow_clk),
+    fft_control fft_core (
+        .clk          (clk),        // main control clock
+        .ram_clk      (ram_clk),    // RAM clock
+        .slow_clk     (slow_clk),   // slower datapath clock if needed
         .reset        (reset),
-        .start        (fft_start),
-        .load         (fft_load),
+        .start        (fft_start),  // asserted in clk domain
+        .load         (fft_load),   // asserted in clk domain
         .load_adr     (fft_load_addr),
         .data_in      (data_to_fft),
         .done         (fft_done_core),
@@ -73,108 +60,148 @@ module fft (
     );
 
     // -------------------------------------------------------------------------
-    // Output buffer + SPI-out (unchanged)
+    // Output Buffer (FFT results â†’ SPI read path)
     // -------------------------------------------------------------------------
     logic [8:0]  fft_result_addr;
     logic [8:0]  spi_read_addr;
     logic [31:0] spi_read_data;
-    logic        buffer_ready;
     logic        clear_buffer;
 
     fft_out_flop outbuf (
-        .clk           (clk),
-        .reset         (reset),
-        .data_from_fft (fft_data_out),
-        .fft_write_addr(fft_result_addr),
-        .fft_write_en  (fft_done_core),
-        .spi_read_addr (spi_read_addr),
-        .spi_read_data (spi_read_data),
-        .clear_buffer  (clear_buffer),
-        .buffer_ready  (buffer_ready)
-    );
-
-    fft_spi_out spiout (
-        .sck          (sck),
-        .reset        (reset),
-        .buffer_ready (buffer_ready),
-        .spi_read_addr(spi_read_addr),
-        .spi_read_data(spi_read_data),
-        .clear_buffer (clear_buffer),
-        .sdo          (sdo)
+        .clk            (clk),
+        .reset          (reset),
+        .data_from_fft  (fft_data_out),
+        .fft_write_addr (fft_result_addr),
+        .fft_write_en   (fft_done_core),
+        .spi_read_addr  (spi_read_addr),
+        .spi_read_data  (spi_read_data),
+        .clear_buffer   (clear_buffer),
+        .buffer_ready   ()
     );
 
     // -------------------------------------------------------------------------
-    // Frame-level FSM: IDLE → LOAD → PROCESS → DONE_ST → IDLE (continuous)
+    // SPI Output Serializer
     // -------------------------------------------------------------------------
+    spi_fft_out spi_out (
+        .sck      (sck),
+		.cs       (cs),
+        .reset    (reset),
+        .clk      (clk),
+        .fft_data (spi_read_data),
+        .spi_addr (spi_read_addr),
+        .sdo      (sdo)
+    );
+
+    // =========================================================================
+    //                    FRAME FSM (runs in clk domain)
+    // IDLE â†’ LOAD â†’ PROCESS â†’ DONE_ST â†’ IDLE
+    // =========================================================================
+
     typedef enum logic [1:0] {IDLE, LOAD, PROCESS, DONE_ST} state_t;
-    state_t    state;
-    logic [8:0] load_ptr;
+    state_t state, state_next;
 
-    always_ff @(posedge slow_clk or posedge reset) begin
+    logic [8:0] load_ptr;         // 0..511
+    logic       fft_start_pulse;
+
+    // -------------------------------------------------------------------------
+    // State register + LOAD pointer (clk domain)
+    // -------------------------------------------------------------------------
+    always_ff @(posedge clk or posedge reset) begin
         if (reset) begin
             state    <= IDLE;
             load_ptr <= 9'd0;
         end else begin
-            case (state)
+            state <= state_next;
 
-                IDLE: begin
+            // Increment load_ptr only when we are loading a sample
+            if (state == LOAD && sample_valid) begin
+                if (load_ptr == 9'd511)
                     load_ptr <= 9'd0;
-                    // Wait for input buffer to fill with 512 samples
-                    if (buffer_full)
-                        state <= LOAD;
-                end
+                else
+                    load_ptr <= load_ptr + 1'b1;
+            end
 
-                LOAD: begin
-                    // Walk through 0..511 to feed FFT
-                    if (load_ptr == 9'd511) begin
-                        load_ptr <= 9'd0;
-                        state    <= PROCESS;
-                    end else begin
-                        load_ptr <= load_ptr + 9'd1;
-                    end
-                end
-
-                PROCESS: begin
-                    load_ptr <= 9'd0;
-                    if (fft_done_core)
-                        state <= DONE_ST;
-                end
-
-                DONE_ST: begin
-                    load_ptr <= 9'd0;
-                    // Stay here while we clear the input buffer.
-                    // Once buffer_full has been dropped back to 0,
-                    // we can go back to IDLE and start filling again.
-                    if (!buffer_full)
-                        state <= IDLE;
-                end
-
-            endcase
+            // Ensure pointer reset whenever we go back to IDLE
+            if (state == IDLE)
+                load_ptr <= 9'd0;
         end
     end
 
-    // Combinational control for FFT core + input RAM address
+    // -------------------------------------------------------------------------
+    // Next-state logic (clk domain)
+    // -------------------------------------------------------------------------
     always_comb begin
-        fft_load      = (state == LOAD);
-        fft_start     = (state == PROCESS);
+        state_next = state;
 
-        fft_read_addr = load_ptr;
-        fft_load_addr = load_ptr;
+        case (state)
+
+            // Wait for the first new sample of the frame
+            IDLE: begin
+                if (sample_valid)
+                    state_next = LOAD;
+            end
+
+            // Load 512 real samples (one per sample_valid pulse)
+            LOAD: begin
+                if (sample_valid && load_ptr == 9'd511)
+                    state_next = PROCESS;
+            end
+
+            // FFT core computation
+            PROCESS: begin
+                if (!fft_processing)
+                    state_next = DONE_ST;
+            end
+
+            // One-cycle "done" state, then go back to IDLE
+            DONE_ST: begin
+                //if (load_ptr == 9'd511)
+				state_next = IDLE;
+            end
+
+        endcase
     end
 
-    // NEW: generate clear_frame for input buffer
-    // While in DONE_ST, keep input buffer cleared (no accumulation).
-    // Once we leave DONE_ST, clear_frame de-asserts and the next 512
-    // samples will be captured.
+    // -------------------------------------------------------------------------
+    // Pulse START exactly once at LOAD â†’ PROCESS transition (clk domain)
+    // -------------------------------------------------------------------------
     always_ff @(posedge clk or posedge reset) begin
         if (reset)
-            clear_frame <= 1'b0;
+            fft_start_pulse <= 1'b0;
         else
-            clear_frame <= (state == DONE_ST);
+            fft_start_pulse <= (state == LOAD && state_next == PROCESS);
     end
 
-    // "done" indicates that a frame's FFT has completed (we're in DONE_ST)
-    assign fft_result_addr = load_ptr;  // (unchanged – same address used for writes)
-    assign done            = (state == DONE_ST);
+    assign fft_start = fft_start_pulse;
+
+    // -------------------------------------------------------------------------
+    // LOAD signal â€” pulse when we have a new sample to write
+    // -------------------------------------------------------------------------
+    assign fft_load      = (state == LOAD) && sample_valid;
+
+    // -------------------------------------------------------------------------
+    // Address wiring
+    //   - During LOAD, we step through 0..511 in load_ptr
+    //   - fft_load_addr drives the input write address into fft_control
+    //   - fft_result_addr is still tied to load_ptr as a placeholder
+    // -------------------------------------------------------------------------
+    assign fft_load_addr   = load_ptr;
+    assign fft_result_addr = load_ptr;   // OK for now; refine once you know
+                                         // how fft_done_core behaves (per-bin vs per-frame)
+
+    // -------------------------------------------------------------------------
+    // Clear FFT output buffer when DONE_ST
+    // -------------------------------------------------------------------------
+    assign clear_buffer = (state == DONE_ST);
+
+    // -------------------------------------------------------------------------
+    // Done signal for top level
+    // -------------------------------------------------------------------------
+    assign done = (state == DONE_ST);
 
 endmodule
+
+
+
+
+
