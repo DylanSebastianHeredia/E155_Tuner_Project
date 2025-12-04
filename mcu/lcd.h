@@ -1,5 +1,5 @@
-#ifndef MAIN_LCD_H
-#define MAIN_LCD_H
+#ifndef LCD_H
+#define LCD_H
 
 #include "STM32L432KC_GPIO.h"
 #include "STM32L432KC_RCC.h"
@@ -31,3 +31,4 @@ void lcd_send_cmd(uint8_t cmd);
 void lcd_send_data(uint8_t data);
 
 #endif
+
