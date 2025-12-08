@@ -56,17 +56,13 @@ module fft_master_tb;
         end
     end
 
-    // -----------------------------------------------------------------
     // SPI CLOCK FOR OUTPUT CAPTURE
-    // -----------------------------------------------------------------
     initial begin
         sck = 0;
         forever #50 sck = ~sck;  // 10 MHz SPI clock
     end
 
-    // -----------------------------------------------------------------
-    // CAPTURE SDO DATA (deserialize)
-    // -----------------------------------------------------------------
+    // CAPTURE SDO DATA 
     logic [31:0] shiftreg;
     int bitcount = 0;
     int out_idx = 0;
@@ -89,12 +85,10 @@ module fft_master_tb;
         end
     end
 
-    // -----------------------------------------------------------------
-    // Safety timeout â€” MUST cover full-frame time
-    // -----------------------------------------------------------------
+    // Safety timeout MUST cover full-frame time
     initial begin
         #20_000_000;  // 20ms
-        $display("TIMEOUT â€” did not receive FFT frame");
+        $display("TIMEOUT: Did not receive FFT frame");
         $finish;
     end
 
