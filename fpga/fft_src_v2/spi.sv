@@ -45,9 +45,6 @@ module spi_fft_out (
     output logic        sdo         // goes to MCU MISO
 );
 
-    // =========================================================================
-    // Internal
-    // =========================================================================
     logic [31:0] shift_reg;
     logic [5:0]  bit_cnt;        // 0..31
     logic [8:0]  word_cnt;       // 0..511
@@ -56,9 +53,7 @@ module spi_fft_out (
     assign sdo      = (cs == 1'b0) ? sdo_reg : 1'b0;   // idle when CS high
     assign spi_addr = word_cnt;
 
-    // =========================================================================
-    // SINGLE always_ff for counters + shifting
-    // =========================================================================
+    // counters + shifting
     always_ff @(posedge sck or posedge reset) begin
         if (reset) begin
             bit_cnt   <= 0;
@@ -71,7 +66,7 @@ module spi_fft_out (
             word_cnt  <= 0;
 
         end else begin
-            // ========== CS LOW â†’ ACTIVE SPI TRANSFER ==========
+            // CS LOW at ACTIVE SPI TRANSFER 
 
             if (bit_cnt == 0) begin
                 // load new 32-bit word from FFT buffer
@@ -88,9 +83,8 @@ module spi_fft_out (
         end
     end
 
-    // =========================================================================
+    
     // SHIFT OUT (negedge SCK ONLY when CS low)
-    // =========================================================================
     always_ff @(negedge sck or posedge reset) begin
         if (reset)
             sdo_reg <= 0;
