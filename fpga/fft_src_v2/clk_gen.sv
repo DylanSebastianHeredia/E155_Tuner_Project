@@ -4,7 +4,7 @@
 
 // i2s_clkgen_bck.sv
 // Generate I2S bit clock (BCK) from 48 MHz HFOSC
-// Divide by 16 → 48 MHz / 16 = 3.0 MHz
+// Divide by 16 to 48 MHz / 16 = 3.0 MHz
 
 module i2s_clkgen_bck #(
     parameter DIV = 16     // must be even
