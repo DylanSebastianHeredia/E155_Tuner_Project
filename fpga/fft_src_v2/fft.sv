@@ -1,9 +1,11 @@
-//------------------------------------------------------------------------------
+// Broderick Bownds & Sebastian Heredia
+// brbownds@hmc.edu, dheredia@hmc.edu
+// 11/31/25
+
 // fft.sv
 // 512-point FFT Top-Level
-// - Drives fft_control from the main clk domain
-// - Uses sample_valid directly (also in clk domain)
-//------------------------------------------------------------------------------
+// Drives fft_control from the main clk domain
+// Uses sample_valid directly (also in clk domain)
 
 module fft (
     input  logic        sck,           // SPI clock from MCU
@@ -18,9 +20,7 @@ module fft (
     output logic        done           // Frame complete
 );
 
-    // -------------------------------------------------------------------------
-    // Internal Clock Division (for fft_control / RAM)
-    // -------------------------------------------------------------------------
+	// Internal Clock Division (for fft_control)
     logic [1:0] clk_counter = 2'd0;
     logic       ram_clk;
     logic       slow_clk;
@@ -35,9 +35,7 @@ module fft (
     logic [31:0] data_to_fft;
     assign data_to_fft = sample_in;
 
-    // -------------------------------------------------------------------------
-    // FFT Core Interface
-    // -------------------------------------------------------------------------
+    // Internal Logic for FFT Core Interface
     logic        fft_load;
     logic        fft_start;
     logic        fft_processing;
@@ -59,9 +57,7 @@ module fft (
         .data_out     (fft_data_out)
     );
 
-    // -------------------------------------------------------------------------
-    // Output Buffer (FFT results â†’ SPI read path)
-    // -------------------------------------------------------------------------
+	// Output Buffer (FFT results for SPI read path)
     logic [8:0]  fft_result_addr;
     logic [8:0]  spi_read_addr;
     logic [31:0] spi_read_data;
@@ -79,9 +75,7 @@ module fft (
         .buffer_ready   ()
     );
 
-    // -------------------------------------------------------------------------
     // SPI Output Serializer
-    // -------------------------------------------------------------------------
     spi_fft_out spi_out (
         .sck      (sck),
 		.cs       (cs),
@@ -91,21 +85,17 @@ module fft (
         .spi_addr (spi_read_addr),
         .sdo      (sdo)
     );
-
-    // =========================================================================
-    //                    FRAME FSM (runs in clk domain)
-    // IDLE â†’ LOAD â†’ PROCESS â†’ DONE_ST â†’ IDLE
-    // =========================================================================
+	
+    // FFT FSM for top-level logic
+	// STATES: IDLE, LOAD, PROCESS< DONE_ST based on sample_valid sample_in
 
     typedef enum logic [1:0] {IDLE, LOAD, PROCESS, DONE_ST} state_t;
     state_t state, state_next;
 
-    logic [8:0] load_ptr;         // 0..511
+	logic [8:0] load_ptr;         // 0 to 511
     logic       fft_start_pulse;
 
-    // -------------------------------------------------------------------------
     // State register + LOAD pointer (clk domain)
-    // -------------------------------------------------------------------------
     always_ff @(posedge clk or posedge reset) begin
         if (reset) begin
             state    <= IDLE;
@@ -127,9 +117,7 @@ module fft (
         end
     end
 
-    // -------------------------------------------------------------------------
-    // Next-state logic (clk domain)
-    // -------------------------------------------------------------------------
+    // Next-state logic 
     always_comb begin
         state_next = state;
 
@@ -153,7 +141,7 @@ module fft (
                     state_next = DONE_ST;
             end
 
-            // One-cycle "done" state, then go back to IDLE
+            // One-cycle DONE_ST, then go back to IDLE
             DONE_ST: begin
                 //if (load_ptr == 9'd511)
 				state_next = IDLE;
@@ -162,9 +150,7 @@ module fft (
         endcase
     end
 
-    // -------------------------------------------------------------------------
-    // Pulse START exactly once at LOAD â†’ PROCESS transition (clk domain)
-    // -------------------------------------------------------------------------
+    // Pulse START exactly once at LOAD when PROCESS transition
     always_ff @(posedge clk or posedge reset) begin
         if (reset)
             fft_start_pulse <= 1'b0;
@@ -174,29 +160,22 @@ module fft (
 
     assign fft_start = fft_start_pulse;
 
-    // -------------------------------------------------------------------------
-    // LOAD signal â€” pulse when we have a new sample to write
-    // -------------------------------------------------------------------------
+    // LOAD signal pulse when we have a new sample to write
     assign fft_load      = (state == LOAD) && sample_valid;
 
-    // -------------------------------------------------------------------------
     // Address wiring
-    //   - During LOAD, we step through 0..511 in load_ptr
-    //   - fft_load_addr drives the input write address into fft_control
-    //   - fft_result_addr is still tied to load_ptr as a placeholder
-    // -------------------------------------------------------------------------
+    // During LOAD, we step through 0 to 511 in load_ptr
+    // fft_load_addr drives the input write address into fft_control
+    // fft_result_addr is still tied to load_ptr as a placeholder
+	
     assign fft_load_addr   = load_ptr;
     assign fft_result_addr = load_ptr;   // OK for now; refine once you know
                                          // how fft_done_core behaves (per-bin vs per-frame)
 
-    // -------------------------------------------------------------------------
     // Clear FFT output buffer when DONE_ST
-    // -------------------------------------------------------------------------
     assign clear_buffer = (state == DONE_ST);
 
-    // -------------------------------------------------------------------------
     // Done signal for top level
-    // -------------------------------------------------------------------------
     assign done = (state == DONE_ST);
 
 endmodule
