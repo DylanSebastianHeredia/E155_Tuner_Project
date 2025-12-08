@@ -1,8 +1,10 @@
-// =============================================================
+// Broderick Bownds & Sebastian Heredia
+// brbownds@hmc.edu, dheredia@hmc.edu
+// 12/1/2025
+
 // i2s_clkgen_bck.sv
 // Generate I2S bit clock (BCK) from 48 MHz HFOSC
-// Default: divide by 16 → 48 MHz / 16 = 3.0 MHz
-// =============================================================
+// Divide by 16 → 48 MHz / 16 = 3.0 MHz
 
 module i2s_clkgen_bck #(
     parameter DIV = 16     // must be even
@@ -32,19 +34,17 @@ module i2s_clkgen_bck #(
 
 endmodule
 
-// =============================================================
 // i2s_clkgen_lrck.sv
-// Generate I2S LRCK (left/right clock) from BCK
-// LRCK = BCK / 64  → with BCK=3MHz → LRCK ≈ 46.875 kHz
-// =============================================================
+// Generate I2S LRCK from BCK
+// LRCK = BCK / 64  with BCK=3MHz  LRCK = 46.875 kHz
 
 module i2s_clkgen_lrck (
     input  logic bck,      // bit clock
     input  logic reset,
-    output logic lrck      // ~48 kHz output
+    output logic lrck      // 48 kHz output
 );
 
-    logic [5:0] cnt = 0;   // count 0..63
+    logic [5:0] cnt = 0;   // count 0 to 63
 
     always_ff @(posedge bck or posedge reset) begin
         if (reset) begin
