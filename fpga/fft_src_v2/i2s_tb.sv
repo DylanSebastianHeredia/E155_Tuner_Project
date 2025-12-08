@@ -2,15 +2,11 @@
 
 module tb_i2s_left_only;
 
-    // =============================================================
-    // Parameters (match DUT)
-    // =============================================================
+    
     localparam FRAME_RES = 32;
     localparam DATA_RES  = 24;
 
-    // =============================================================
-    // DUT I/O
-    // =============================================================
+    
     logic bck_i;
     logic lrck_i;
     logic dat_i;
@@ -18,9 +14,7 @@ module tb_i2s_left_only;
     logic [DATA_RES-1:0] left_o;
     logic [DATA_RES-1:0] right_o;
 
-    // =============================================================
-    // DUT Instantiation
-    // =============================================================
+   
     top_i2s_rx_module #(
         .FRAME_RES(FRAME_RES),
         .DATA_RES(DATA_RES)
@@ -32,20 +26,14 @@ module tb_i2s_left_only;
         .right_o (right_o)
     );
 
-    // =============================================================
-    // Clock: BCK
-    // =============================================================
+    
     initial bck_i = 0;
     always #10 bck_i = ~bck_i;   // 50 MHz BCK (fast enough for simulation)
 
-    // =============================================================
-    // LRCK = Constant LOW → LEFT CHANNEL ONLY
-    // =============================================================
+   
     initial lrck_i = 1'b0;   // mic left-channel mode
 
-    // =============================================================
-    // Send ONE left-channel I²S frame (32 bits with 24-bit data)
-    // =============================================================
+
 
     task send_left_frame(input [23:0] left_data);
         integer bitpos;
@@ -64,9 +52,7 @@ module tb_i2s_left_only;
         end
     endtask
 
-    // =============================================================
-    // Test Stimulus
-    // =============================================================
+   
     initial begin
         // Dump waveforms
         $dumpfile("tb_i2s_left_only.vcd");
