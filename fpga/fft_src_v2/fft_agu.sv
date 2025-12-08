@@ -1,4 +1,9 @@
-	// Takes in load, done, butterfly_iter, and fft_level,
+// Broderick Bownds & Sebastian Heredia
+// brbownds@hmc.edu, dheredia@hmc.edu
+// 12/1/2025
+
+// fft_agu.sv
+// Takes in load, done, butterfly_iter, and fft_level,
 // outputs read/write addresses
 module fft_agu 
 	#(parameter M = 9)
