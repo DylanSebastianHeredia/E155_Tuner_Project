@@ -1,3 +1,10 @@
+// Broderick Bownds & Sebastian Heredia
+// brbownds@hmc.edu, dheredia@hmc.edu
+// 12/1/2025
+
+// fft_master.sv is the top level to have bigger logic be internal such as 
+// [31:0] data_out, and [31:0] data_in
+
 module fft_master (
 	input logic sck,
     input  logic sd_in,
@@ -7,12 +14,9 @@ module fft_master (
     output logic sdo,
     output logic bck_i,
     output logic lrck_i,
-	output logic LED0, LED1
 );
 
-    // ===========================================================
     // 48 MHz Internal Oscillator
-    // ===========================================================
     logic clk;
     HSOSC #(.CLKHF_DIV("0b10")) hf_osc (
         .CLKHFPU (1'b1),
@@ -20,32 +24,22 @@ module fft_master (
         .CLKHF   (clk)
     );
 
-    // ===========================================================
     // I2S Clock Generators
-    // ===========================================================
-
-    // DO NOT redeclare bck_i or lrck_i here!
-    // They are already outputs.
-
     // Generate 3 MHz BCK from 48 MHz
-    i2s_clkgen_bck #(
-        .DIV(16)               // 48 MHz / 16 = 3.0 MHz
-    ) gen_bck (
+    i2s_clkgen_bck #(.DIV(16)) gen_bck (
         .clk   (clk),
         .reset (reset),
         .bck   (bck_i)
     );
 
-    // Generate ~48 kHz LRCK from BCK
+    // Generate 48 kHz LRCK from BCK
     i2s_clkgen_lrck gen_lrck (
         .bck   (bck_i),
         .reset (reset),
         .lrck  (lrck_i)
     );
 
-    // ===========================================================
     // I2S Receiver (left only)
-    // ===========================================================
     logic [23:0] left24;
 
     top_i2s_rx_module i2s_inst (
@@ -56,10 +50,8 @@ module fft_master (
         .right_o()
     );
 
-    // ===========================================================
     // Sample Valid Detection
     // Synchronize left24 into clk domain
-    // ===========================================================
     logic [23:0] left24_sync1, left24_sync2;
 
     always_ff @(posedge clk or posedge reset) begin
@@ -75,15 +67,12 @@ module fft_master (
     logic sample_valid;
     assign sample_valid = (left24_sync1 != left24_sync2);
 
-    // ===========================================================
+    
     // Convert to 32-bit sample for FFT
-    // ===========================================================
     logic [31:0] sample32;
     assign sample32 = {left24_sync2, 8'd0};
 
-    // ===========================================================
     // FFT System
-    // ===========================================================
     logic sdo_int;
 
     fft fft_inst (
@@ -96,8 +85,7 @@ module fft_master (
         .sdo          (sdo_int),
         .done         (done)
     );
-	assign LED0 = bck_i;
-	assign LED1 = lrck_i;
+	
     assign sdo = sdo_int;
 
 endmodule
